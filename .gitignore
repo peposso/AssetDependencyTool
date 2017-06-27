@@ -32,3 +32,11 @@ sysinfo.txt
 # Builds
 *.apk
 *.unitypackage
+
+/.vscode/
+
+.DS_Store
+Thumbs.db
+Thumbs.db.meta
+desktop.ini
+desktop.ini.meta
