@@ -1,0 +1,8 @@
+{
+    "name": "AssetDependencyTool-Editor",
+    "references": [],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": []
+}
