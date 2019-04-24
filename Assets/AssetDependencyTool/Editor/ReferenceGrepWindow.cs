@@ -64,6 +64,11 @@ namespace AssetDependencyTool
             titleContent.text = "Reference Grep";
         }
 
+        void OnDisable()
+        {
+            AssetDependencyDatabase.Close();
+        }
+
         void OnGUI()
         {
             isAutoSelect = EditorGUILayout.Toggle("auto select", isAutoSelect);
@@ -222,6 +227,12 @@ namespace AssetDependencyTool
 
                 items = new List<PathAsset>();
                 scroll = Vector2.zero;
+
+                var refPaths = AssetDependencyDatabase.GetReferences(targetPath);
+                foreach (var refPath in refPaths)
+                {
+                    items.Add(new PathAsset { Path = refPath });
+                }
             }
         }
 
@@ -255,13 +266,17 @@ namespace AssetDependencyTool
         void OnStdout(object sender, System.Diagnostics.DataReceivedEventArgs args)
         {
             if (string.IsNullOrEmpty(args.Data)) return;
-            Debug.Log(args.Data);
+            // Debug.Log(args.Data);
             foreach (var line in args.Data.Split('\n'))
             {
                 var path = line.Trim().Replace('\\', '/');
                 if (!items.Any(i => i.Path == path))
                 {
                     items.Add(new PathAsset { Path = path });
+                    if (!isFindPath)
+                    {
+                        AssetDependencyDatabase.InsertDependencyPath(path, targetPath);
+                    }
                 }
             }
         }
@@ -281,6 +296,6 @@ namespace AssetDependencyTool
                 StartProcess();
             }
         }
-    
+
     }
 }

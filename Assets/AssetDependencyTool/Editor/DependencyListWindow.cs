@@ -189,8 +189,8 @@ namespace AssetDependencyTool
                 }
                 else
                 {
-                    var list = GetOrNull(references, path);
-                    var count = list == null ? 0 : list.Count(targetList.List.Contains);
+                    var paths = GetOrNull(references, path);
+                    var count = paths == null ? 0 : paths.Count(targetList.List.Contains);
                     EditorGUILayout.LabelField(count.ToString(), GUILayout.Width(15));
                 }
                 if (!isShowDirectory)
