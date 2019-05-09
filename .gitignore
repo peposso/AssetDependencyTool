@@ -40,3 +40,6 @@ Thumbs.db
 Thumbs.db.meta
 desktop.ini
 desktop.ini.meta
+
+/Assets/_Local/
+/Assets/_Local.meta
