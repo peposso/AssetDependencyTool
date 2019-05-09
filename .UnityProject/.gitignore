@@ -4,6 +4,9 @@
 /[Bb]uild/
 /[Bb]uilds/
 /Assets/AssetStoreTools*
+/Assets/_Local/
+/Assets/_Local.meta
+/Logs/
 
 # Visual Studio 2015 cache directory
 /.vs/
@@ -41,5 +44,3 @@ Thumbs.db.meta
 desktop.ini
 desktop.ini.meta
 
-/Assets/_Local/
-/Assets/_Local.meta
