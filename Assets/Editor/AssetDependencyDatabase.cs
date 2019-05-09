@@ -1,11 +1,13 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
 using SQLite;
+#if !NET_2_0 && !NET_2_0_SUBSET
+using System.Collections.Concurrent;
+#endif
 
 namespace AssetDependencyTool
 {
