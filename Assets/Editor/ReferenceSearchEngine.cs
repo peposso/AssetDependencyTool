@@ -90,7 +90,7 @@ namespace AssetDependencyTool
                     if (!File.Exists(arcPath))
                     {
                         #if UNITY_2017
-                        var isDone = true;
+                        var isDone = false;
                         string error = null;
                         UnityEditor.EditorApplication.delayCall += () =>
                         {
