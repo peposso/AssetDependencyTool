@@ -185,6 +185,7 @@ namespace AssetDependencyTool
             menu.AddItem(new GUIContent("Lock #q"), isLocked, () =>
             {
                 isLocked = !isLocked;
+                beforeTarget = null;
             });
             menu.AddItem(new GUIContent("Recursive #r"), isRecursive, () =>
             {
@@ -215,16 +216,46 @@ namespace AssetDependencyTool
 
         #region Button beside context menu
         GUIStyle lockButton = null;
+        GUIStyle recursiveButton = null;
         bool isLocked = false;
 
         void ShowButton(Rect rect)
         {
-            lockButton = lockButton ?? "IN LockButton";
+            lockButton = lockButton ?? new GUIStyle("IN LockButton");
+            var label = new GUIContent(isLocked ? "　 Unlock" : "　 Lock");
+            rect.x += rect.width;
+            rect.width = GUI.skin.box.CalcSize(label).x;
+            rect.x -= rect.width;
             EditorGUI.BeginChangeCheck();
-            var newLock = GUI.Toggle(rect, isLocked, GUIContent.none, lockButton);
+            var newLock = GUI.Toggle(rect, isLocked, label, lockButton);
             if (EditorGUI.EndChangeCheck())
             {
                 isLocked = newLock;
+                beforeTarget = null;
+            }
+
+            if (recursiveButton ==null)
+            {
+                var icon = new GUIStyle("ListToggle").normal.background;
+                recursiveButton = new GUIStyle("IN LockButton");
+                recursiveButton.normal.background = icon;
+                recursiveButton.active.background = icon;
+                recursiveButton.focused.background = icon;
+                recursiveButton.hover.background = icon;
+                recursiveButton.onNormal.background = icon;
+                recursiveButton.onActive.background = icon;
+                recursiveButton.onFocused.background = icon;
+                recursiveButton.onHover.background = icon;
+            }
+            label = new GUIContent(isRecursive ? "　 NonRecursive" : "　 Recursive");
+            rect.width = GUI.skin.box.CalcSize(label).x;
+            rect.x -= rect.width;
+            EditorGUI.BeginChangeCheck();
+            var newRec = GUI.Toggle(rect, isRecursive, label, recursiveButton);
+            if (EditorGUI.EndChangeCheck())
+            {
+                isRecursive = newRec;
+                beforeTarget = null;
             }
         }
         #endregion
