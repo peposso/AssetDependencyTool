@@ -87,7 +87,7 @@ namespace AssetDependencyTool
         // List of files to store
         private List<ZipFileEntry> Files = new List<ZipFileEntry>();
         // Filename of storage file
-        private string FileName;
+        // private string FileName;
         // Stream object of storage file
         private Stream ZipFileStream;
         // General comment
@@ -117,7 +117,7 @@ namespace AssetDependencyTool
             var stream = (Stream)new FileStream(_filename, FileMode.Open, _access == FileAccess.Read ? FileAccess.Read : FileAccess.ReadWrite);
 
             ZipStorer zip = Open(stream, _access);
-            zip.FileName = _filename;
+            // zip.FileName = _filename;
 
             return zip;
         }

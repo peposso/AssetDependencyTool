@@ -32,7 +32,6 @@ namespace AssetDependencyTool
         object sync = new object();
         List<ReferenceSearchEngineProcess> processQueue = new List<ReferenceSearchEngineProcess>();
         ReferenceSearchEngineProcess currentProcess;
-        int mainThreadId;
         Thread worker;
         int workerId;
 
@@ -52,8 +51,6 @@ namespace AssetDependencyTool
                 #endif
                 #endif
             }
-
-            mainThreadId = Thread.CurrentThread.ManagedThreadId;
 
             var sb = new StringBuilder();
             foreach (var ext in AssetDependencyDatabase.IgnoreExtensions)
