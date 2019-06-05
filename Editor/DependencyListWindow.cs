@@ -4,6 +4,7 @@ using System.Linq;
 using UnityEngine;
 using UnityEditor;
 using UnityObject = UnityEngine.Object;
+using System;
 
 namespace AssetDependencyTool
 {
@@ -46,6 +47,9 @@ namespace AssetDependencyTool
         List<string> focusedRefs = null;
         List<string> focusedDeps = null;
         string focusedObjectPath;
+        Vector2 targetScroll;
+        SplitterState splitter;
+
 
         [MenuItem("Tools/Asset Dependency List")]
         public static void OpenEditor()
@@ -89,12 +93,23 @@ namespace AssetDependencyTool
             isShowDirectory = EditorPrefs.GetBool("AssetDependencyTool.DependencyListWindow.isShowDirectory", isShowDirectory);
             sortType = (SortType)EditorPrefs.GetInt("AssetDependencyTool.DependencyListWindow.sortType", (int)sortType);
             history = HistoryJson.Read();
+
+            splitter = new SplitterState(
+                new float[] { 20f, 80f },
+                new int[] { 30, 100 },
+                null
+            );
+            targetScroll = Vector2.zero;
         }
 
         void OnGUI()
         {
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.EndHorizontal();
+
+            SplitterGUILayout.BeginVerticalSplit(splitter);
+            EditorGUILayout.BeginVertical();
+            targetScroll = GUILayout.BeginScrollView(targetScroll);
 
             // var focused = EditorGUILayout.TextField("focus", GUI.GetNameOfFocusedControl());
             var focused = GUI.GetNameOfFocusedControl();
@@ -155,6 +170,11 @@ namespace AssetDependencyTool
                 ListDependencies(Targets);
             }
 
+            GUILayout.EndScrollView();
+            EditorGUILayout.EndVertical();
+
+            EditorGUILayout.BeginVertical();
+            GUILayout.Box("", GUILayout.ExpandWidth(true), GUILayout.Height(1));
             EditorGUILayout.LabelField(string.Format("dependencies: {0}", objectList.Count));
 
             objectList.Draw();
@@ -177,6 +197,8 @@ namespace AssetDependencyTool
                 Duplicate();
             }
             EditorGUILayout.EndHorizontal();
+            EditorGUILayout.EndVertical();
+            SplitterGUILayout.EndVerticalSplit();
 
             var ev = Event.current;
             if (ev.type == EventType.KeyDown)
@@ -351,7 +373,7 @@ namespace AssetDependencyTool
                 }
                 if (next != null)
                 {
-                    EditorGUIUtility.PingObject(AssetDatabase.LoadAssetAtPath(next, typeof(Object)));
+                    EditorGUIUtility.PingObject(AssetDatabase.LoadAssetAtPath(next, typeof(UnityObject)));
                 }
             }
             else if (keyCode == KeyCode.S && !Event.current.alt)

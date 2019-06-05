@@ -9,18 +9,19 @@
 
 # Install
 
-## Unity 2018.3~
+## >= Unity 2018.3
 
-Insert a following into Packages/manifest.json
+Insert this keyValue into Packages/manifest.json
 
 ```json
 {
   "dependencies": {
-    "peposso.assetdependencytool": "https://github.com/peposso/AssetDependencyTool.git"
+    "peposso.assetdependencytool": "https://github.com/peposso/AssetDependencyTool.git",
+    ...
   }
 }
 ```
 
-## Unity ~2018.3
+## <= Unity 2018.2
 
-Copy Assets/Editor to your project.
+Copy Editor to your project.
