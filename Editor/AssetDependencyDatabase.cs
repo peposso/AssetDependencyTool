@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using SQLite;
+using System.Linq.Expressions;
 #if !NET_2_0 && !NET_2_0_SUBSET
 using System.Collections.Concurrent;
 #endif
@@ -102,12 +103,14 @@ namespace AssetDependencyTool
                 return;
             }
             var db = Open();
-            var dep = new Dependency();
-            dep.TargetGUID = targetGUID;
-            dep.DependencyGUID = depGUID;
-            dep.ModifiedAt = ToUnixTime(fileInfo.LastWriteTimeUtc);
-            dep.FileSize = (int)fileInfo.Length;
-            dep.UpdateAt = Now();
+            var dep = new Dependency
+            {
+                TargetGUID = targetGUID,
+                DependencyGUID = depGUID,
+                ModifiedAt = ToUnixTime(fileInfo.LastWriteTimeUtc),
+                FileSize = (int)fileInfo.Length,
+                UpdateAt = Now()
+            };
             try
             {
                 db.Insert(dep);
@@ -133,6 +136,7 @@ namespace AssetDependencyTool
             {
                 var refGUID = r.TargetGUID;
                 var refPath = GUIDToPath(refGUID, true);
+                if (refPath == null) continue;
                 var fi = new FileInfo(refPath);
                 var modAt = ToUnixTime(fi.LastWriteTimeUtc);
                 if (fi.Exists && r.ModifiedAt == modAt && r.FileSize == fi.Length)
@@ -151,36 +155,40 @@ namespace AssetDependencyTool
         {
             // without validation!!
             var db = Open();
-            var list = db.Query<Dependency>("select * from Dependency where DependencyGUID = ?", guid);
+            var rows = db.QueryEqual<Dependency>(d => d.DependencyGUID, guid);
             var result = new List<string>();
-            foreach (var r in list)
+            foreach (var r in rows)
             {
                 result.Add(r.TargetGUID);
             }
             return result;
         }
 
-        public static string PathToGUID(string path, bool validation = false)
+        public static AssetInfo GetAssetInfo(string path)
         {
             var db = Open();
-            var r = db.Query<AssetInfo>("select * from AssetInfo where Path = ?", path);
+            return db.FindEqual<AssetInfo>(ai => ai.Path, path);
+        }
+
+        public static string PathToGUID(string path, bool validation = false)
+        {
+            var assetInfo = GetAssetInfo(path);
             FileInfo fileInfo = null;
-            if (r.Count == 1)
+            if (assetInfo != null)
             {
-                var info = r[0];
                 if (!validation)
                 {
-                    return info.GUID;
+                    return assetInfo.GUID;
                 }
                 fileInfo = new FileInfo(path);
                 var modAt = ToUnixTime(fileInfo.LastWriteTimeUtc);
-                if (fileInfo.Exists && info.ModifiedAt == modAt && info.FileSize == fileInfo.Length)
+                if (fileInfo.Exists && assetInfo.ModifiedAt == modAt && assetInfo.FileSize == fileInfo.Length)
                 {
-                    return info.GUID;
+                    return assetInfo.GUID;
                 }
                 else
                 {
-                    db.Execute("delete from AssetInfo where GUID = ?", info.GUID);
+                    Open().Execute("delete from AssetInfo where GUID = ?", assetInfo.GUID);
                 }
             }
 
@@ -196,20 +204,19 @@ namespace AssetDependencyTool
         public static string GUIDToPath(string guid, bool validation = false)
         {
             var db = Open();
-            var r = db.Query<AssetInfo>("select * from AssetInfo where GUID = ?", guid);
+            var assetInfo = db.FindEqual<AssetInfo>(a => a.GUID, guid);
             string path = null;
             FileInfo fileInfo = null;
-            if (r.Count == 1)
+            if (assetInfo != null)
             {
-                var info = r[0];
                 if (!validation)
                 {
-                    return info.Path;
+                    return assetInfo.Path;
                 }
-                path = info.Path;
+                path = assetInfo.Path;
                 fileInfo = new FileInfo(path);
                 var modAt = ToUnixTime(fileInfo.LastWriteTimeUtc);
-                if (info.ModifiedAt == modAt && info.FileSize == fileInfo.Length)
+                if (fileInfo.Exists && assetInfo.ModifiedAt == modAt && assetInfo.FileSize == fileInfo.Length)
                 {
                     return path;
                 }
@@ -217,6 +224,7 @@ namespace AssetDependencyTool
                 {
                     db.Execute("delete from AssetInfo where GUID = ?", guid);
                 }
+                if (!fileInfo.Exists) path = null;
             }
 
             if (path == null)
@@ -229,7 +237,7 @@ namespace AssetDependencyTool
             }
 
             InsertAssetInfo(guid, path, fileInfo);
-            return guid;
+            return path;
         }
 
         static void InsertAssetInfo(string path, string guid, FileInfo fileInfo = null)
@@ -400,51 +408,39 @@ namespace AssetDependencyTool
                     {
                         return;
                     }
-                    var ext = Path.GetExtension(path);
-                    if (IgnoreExtensions.Contains(ext))
-                    {
-                        continue;
-                    }
-                    var fileInfo = new FileInfo(path);
-                    if (!fileInfo.Exists || fileInfo.Length > int.MaxValue || fileInfo.Length < 40)
+                    // Log(path);
+                    FileInfo fileInfo;
+                    AssetInfo assetInfo;
+                    if (!NeedsScan(path, out fileInfo, out assetInfo))
                     {
                         continue;
                     }
                     var modAt = ToUnixTime(fileInfo.LastWriteTimeUtc);
                     var len = (int)fileInfo.Length;
-                    var db = Open();
-                    var r = db.Query<AssetInfo>("select * from AssetInfo where Path = ?", path);
-                    var assetInfo = r.Count == 1 ? r[0] : null;
-                    string targetGUID = null;
-                    if (assetInfo != null)
-                    {
-                        if (assetInfo.FileSize == len &&
-                            assetInfo.ModifiedAt == modAt &&
-                            assetInfo.ScanAt > assetInfo.ModifiedAt)
-                        {
-                            continue;
-                        }
-                        targetGUID = assetInfo.GUID;
-                    }
-                    targetGUID = targetGUID ?? ReadGUIDFromMeta(path);
+                    var targetGUID = assetInfo.GUID;
                     if (targetGUID == null)
                     {
                         continue;
                     }
-                    // Log($"scan.. {path} {targetGUID}");
+                    // Log($"read.. {path} {targetGUID}");
                     if (!ReadBuffer(path, ref buffer, len))
                     {
                         continue;
                     }
+                    // Log($"collect.. {path} {targetGUID}");
                     guids = CollectGUIDs(buffer, len, guids);
                     if (guids.Count == 0)
                     {
                         continue;
                     }
-                    db = Open();
+                    // Log($"insert.. {path} {targetGUID}");
+                    // db.Execute("delete from Dependency where TargetGUID = ?", targetGUID);
+                    var db = Open();
+                    db.BeginTransaction();
                     var dep = new Dependency();
                     foreach (var guid in guids)
                     {
+                        // Log($"{path} {targetGUID} -> {guid}");
                         dep.TargetGUID = targetGUID;
                         dep.DependencyGUID = guid;
                         dep.ModifiedAt = modAt;
@@ -454,9 +450,14 @@ namespace AssetDependencyTool
                         {
                             db.Insert(dep);
                         }
-                        catch (SQLiteException e)
+                        catch (SQLiteException)
                         {
-                            System.Console.WriteLine(e);
+                            var dup = db.FindEqual<Dependency>(d => d.TargetGUID, targetGUID, d => d.DependencyGUID, guid);
+                            if (dup != null)
+                            {
+                                dep.ID = dup.ID;
+                                db.InsertOrReplace(dep);
+                            }
                         }
                     }
                     assetInfo = assetInfo ?? new AssetInfo();
@@ -467,15 +468,68 @@ namespace AssetDependencyTool
                     assetInfo.ModifiedAt = modAt;
                     assetInfo.ScanAt = Now();
                     db.InsertOrReplace(assetInfo);
+                    db.Commit();
                 }
             }
-            catch (ThreadAbortException)
-            {
-            }
+            // catch (ThreadAbortException)
+            // {
+            // }
             catch (Exception e)
             {
                 Log(e.ToString());
             }
+            finally
+            {
+                scanWorker = null;
+            }
+        }
+
+        static bool NeedsScan(string path, out FileInfo fileInfo, out AssetInfo assetInfo)
+        {
+            assetInfo = null;
+            fileInfo = new FileInfo(path);
+            var ext = Path.GetExtension(path);
+            if (!fileInfo.Exists || fileInfo.Length > int.MaxValue || fileInfo.Length < 40)
+            {
+                return false;
+            }
+            if (IgnoreExtensions.Contains(ext))
+            {
+                return false;
+            }
+            var modAt = ToUnixTime(fileInfo.LastWriteTimeUtc);
+            var len = (int)fileInfo.Length;
+            var db = Open();
+            var r = db.Query<AssetInfo>("select * from AssetInfo where Path = ?", path);
+            assetInfo = r.Count == 1 ? r[0] : null;
+            string targetGUID = null;
+            if (assetInfo != null)
+            {
+                if (assetInfo.FileSize == len &&
+                    assetInfo.ModifiedAt == modAt &&
+                    assetInfo.ScanAt > assetInfo.ModifiedAt)
+                {
+                    assetInfo.Path = path;
+                    assetInfo.FileSize = len;
+                    assetInfo.ModifiedAt = modAt;
+                    return false;
+                }
+                targetGUID = assetInfo.GUID;
+            }
+            targetGUID = targetGUID ?? ReadGUIDFromMeta(path);
+            if (targetGUID == null)
+            {
+                return false;
+            }
+            if (assetInfo == null)
+            {
+                assetInfo = new AssetInfo();
+                assetInfo.Path = path;
+                assetInfo.FileSize = len;
+                assetInfo.ModifiedAt = modAt;
+            }
+            assetInfo.GUID = targetGUID;
+            return true;
         }
 
         static bool ReadBuffer(string path, ref byte[] buffer, int len)
@@ -507,6 +561,10 @@ namespace AssetDependencyTool
                 {
                     buffer = new byte[len];
                 }
+                else if (buffer.Length > len * 2)
+                {
+                    Array.Resize(ref buffer, buffer.Length / 2);
+                }
                 fs.Seek(0, SeekOrigin.Begin);
                 var count = 0;
                 var offset = 0;
@@ -526,21 +584,27 @@ namespace AssetDependencyTool
             var i = 31;
             while (i < len)
             {
-                if (IsHexChar(bytes[i]))
+                var b = bytes[i];
+                if (('0' <= b && b <= '9') || ('a' <= b && b <= 'f'))
                 {
-                    var j1 = i - 1;
-                    for (; j1 > 0 && IsHexChar(bytes[j1]); --j1) { }
-                    ++j1;
-                    var j2 = i + 1;
-                    for (; j2 < len && j2 - j1 < 33 && IsHexChar(bytes[j2]); ++j2) { }
-                    --j2;
-                    var n = j2 - j1 + 1;
+                    var j1 = i + 1;
+                    for (; j1 < len && j1 - i < 34 && IsHexChar(bytes[j1]); ++j1) { }
+                    if (j1 - i > 32)
+                    {
+                        i += j1 + 32;
+                        continue;
+                    }
+                    --j1;
+                    var j2 = i - 1;
+                    for (; j2 > 0 && j1 - j2 < 34 && IsHexChar(bytes[j2]); --j2) { }
+                    ++j2;
+                    var n = j1 - j2 + 1;
                     if (n == 32)
                     {
-                        var guid = Encoding.UTF8.GetString(bytes, j1, 32);
+                        var guid = Encoding.UTF8.GetString(bytes, j2, 32);
                         if (!guids.Contains(guid)) guids.Add(guid);
                     }
-                    i = j2 + 33;
+                    i = j1 + 33;
                 }
                 else
                 {
@@ -555,12 +619,142 @@ namespace AssetDependencyTool
         {
             return ('0' <= b && b <= '9') || ('a' <= b && b <= 'f');
         }
+
+        static Thread fullScanWorker;
+
+        public static bool IsFullScanRunning()
+        {
+            return fullScanWorker != null && fullScanWorker.IsAlive;
+        }
+
+        public static int GetScanQueueCount()
+        {
+            return targetQueue.Count;
+        }
+
+        public static void StartFullScanWorker()
+        {
+            if (fullScanWorker == null || !fullScanWorker.IsAlive)
+            {
+                fullScanWorker = new Thread(ScanAllAssets);
+                fullScanWorker.Start();
+            }
+        }
+
+        static void ScanAllAssets()
+        {
+            var rootInfo = GetAssetInfo("Assets");
+            if (rootInfo == null)
+            {
+                rootInfo = new AssetInfo();
+                rootInfo.Path = "Assets";
+                rootInfo.GUID = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+                rootInfo.ScanAt = 0;
+            }
+            var lastScanAt = rootInfo.ScanAt;
+            var startAt = Now();
+            var dirs = new List<string>() { "Assets" };
+
+            for (var i = 0; i < dirs.Count; ++i)
+            {
+                var dir = dirs[i];
+                var di = new DirectoryInfo(dir);
+                var modAt = ToUnixTime(di.LastWriteTimeUtc);
+                if (modAt < lastScanAt)
+                {
+                    dirs.RemoveAt(i--);
+                    continue;
+                }
+                foreach (var child in Directory.GetDirectories(dir))
+                {
+                    dirs.Add(child);
+                }
+            }
+
+            for (var i = 0; i < dirs.Count; ++i)
+            {
+                var dir = dirs[i];
+                var files = Directory.GetFiles(dir);
+                foreach (var name in files)
+                {
+                    if (name[0] == '.') continue;
+                    var ext = Path.GetExtension(name).ToLower();
+                    if (ext == ".meta") continue;
+                    if (!files.Contains(name + ".meta")) continue;
+                    var file = name.Replace('\\', '/');
+                    FileInfo fileInfo;
+                    AssetInfo assetInfo;
+                    if (NeedsScan(file, out fileInfo, out assetInfo))
+                    {
+                        // Log(file);
+                        EnqueueScanDependency(file);
+                    }
+                }
+            }
+            while (targetQueue.Count > 0)
+            {
+                EnqueueScanDependency(null);
+                Thread.Sleep(3000);
+            }
+            rootInfo.ScanAt = startAt;
+            // Log("Ends ScanAll.");
+            Open().InsertOrReplace(rootInfo);
+            fullScanWorker = null;
+        }
+    }
+
+    static class SQLiteExtension
+    {
+        public static TTable FindEqual<TTable>(this SQLiteConnection db, Expression<Func<TTable, object>> prop, object value)
+            where TTable : class, new()
+        {
+            var r = db.QueryEqual<TTable>(prop, value);
+            return r.Count == 1 ? r[0] : null;
+        }
+
+        public static List<T> QueryEqual<T>(
+            this SQLiteConnection db,
+            Expression<Func<T, object>> prop,
+            object value)
+                where T : class, new()
+        {
+            var map = db.GetMapping<T>();
+            var col = map.FindColumn<T>(prop);
+            var q = string.Format("select * from {0} where {1} = ?", map.TableName, col.Name);
+            return db.Query<T>(q, value);
+        }
+
+        public static TTable FindEqual<TTable>(
+            this SQLiteConnection db,
+            Expression<Func<TTable, object>> prop1, object value1,
+            Expression<Func<TTable, object>> prop2, object value2
+        ) where TTable : class, new()
+        {
+            var map = db.GetMapping<TTable>();
+            var col1 = map.FindColumn<TTable>(prop1);
+            var col2 = map.FindColumn<TTable>(prop2);
+            var q = string.Format("select * from {0} where {1} = ? and {2} = ?", map.TableName, col1.Name, col2.Name);
+            var r = db.Query<TTable>(q, value1, value2);
+            return r.Count == 1 ? r[0] : null;
+        }
+
+
     }
 
     #if  NET_2_0 || NET_2_0_SUBSET
     class ConcurrentQueue<T>
     {
         Queue<T> queue  = new Queue<T>();
+        public int Count
+        {
+            get
+            {
+                lock (queue)
+                {
+                    return queue.Count;
+                }
+            }
+        }
         public void Enqueue(T item)
         {
             lock (queue)

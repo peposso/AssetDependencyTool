@@ -56,6 +56,8 @@ namespace AssetDependencyTool
 
             ReferenceSearchEngine.Tracer = s => Debug.Log(s);
             AssetDependencyDatabase.Trace = s => Debug.Log(s);
+
+            AssetDependencyDatabase.StartFullScanWorker();
         }
 
         void OnDisable()
@@ -80,9 +82,9 @@ namespace AssetDependencyTool
                 }
             }
             Target = EditorGUILayout.ObjectField(Target, typeof(UnityObject), false);
-            if (Target != null && EditorWindowSupport.IsMouseDownInLastRect())
+            if (Target != null && AssetMenu.IsMouseDownInLastRect())
             {
-                EditorWindowSupport.PopupObjectHelperMenu(Target);
+                AssetMenu.PopupObjectHelperMenu(Target);
             }
             if (Target == null)
             {
@@ -109,6 +111,7 @@ namespace AssetDependencyTool
                 engine.Start(targetPath, isRecursive, AddObjectList);
             }
 
+            EditorGUILayout.BeginHorizontal();
             if (!engine.IsInitialized)
             {
                 EditorGUILayout.LabelField("initialize ...");
@@ -117,8 +120,19 @@ namespace AssetDependencyTool
             {
                 EditorGUILayout.LabelField(string.Format("references: {0} {1}", objectList.Count, engine.IsSearching ? "..." : ""));
             }
+            if (AssetDependencyDatabase.IsFullScanRunning())
+            {
+                EditorGUILayout.LabelField(string.Format("scan: {0}", AssetDependencyDatabase.GetScanQueueCount()));
+            }
+            else
+            {
+                EditorGUILayout.LabelField("");
+            }
+            EditorGUILayout.EndHorizontal();
 
             objectList.Draw();
+
+            AssetMenu.DequeueContextAction();
         }
 
         void AddObjectList(string path)
@@ -156,9 +170,11 @@ namespace AssetDependencyTool
             if (!isLocked)
             {
                 UnityObject selected = null;
-                if (Selection.objects != null && Selection.objects.Length > 0 && Selection.objects[0] != Target)
+                var objects = Selection.objects;
+                if (objects != null && objects.Length > 0 &&
+                    objects[0] != null && objects[0] != Target)
                 {
-                    selected = Selection.objects[0];
+                    selected = objects[0];
                     var iid = selected.GetInstanceID();
                     var path = AssetDatabase.GetAssetPath(selected);
                     if (iid != beforeSelectedID)
@@ -211,6 +227,10 @@ namespace AssetDependencyTool
             {
                 AssetDependencyDatabase.Truncate();
             });
+            menu.AddItem(new GUIContent("Start Full Scan"), false, () =>
+            {
+                AssetDependencyDatabase.StartFullScanWorker();
+            });
         }
         #endregion
 
@@ -262,10 +282,10 @@ namespace AssetDependencyTool
 
         void OnPostDrawResultItem(ScrollableObjectList list, string path)
         {
-            if (EditorWindowSupport.IsMouseDownInLastRect())
+            if (AssetMenu.IsMouseDownInLastRect())
             {
                 var o = AssetDatabase.LoadAssetAtPath(path, typeof(UnityObject));
-                EditorWindowSupport.PopupObjectHelperMenu(o);
+                AssetMenu.PopupObjectHelperMenu(o);
             }
         }
     }
