@@ -9,8 +9,6 @@
 
 # Install
 
-## >= Unity 2018.3
-
 Insert this keyValue into Packages/manifest.json
 
 ```json
@@ -21,7 +19,3 @@ Insert this keyValue into Packages/manifest.json
   }
 }
 ```
-
-## <= Unity 2018.2
-
-Copy Editor to your project.

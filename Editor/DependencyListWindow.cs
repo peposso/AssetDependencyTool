@@ -4,6 +4,7 @@ using System.Linq;
 using UnityEngine;
 using UnityEditor;
 using UnityObject = UnityEngine.Object;
+using UnityInternalBridge;
 using System;
 
 namespace AssetDependencyTool
@@ -107,7 +108,7 @@ namespace AssetDependencyTool
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.EndHorizontal();
 
-            SplitterGUILayout.BeginVerticalSplit(splitter);
+            SplitterGUILayoutBridge.BeginVerticalSplit(splitter);
             EditorGUILayout.BeginVertical();
             targetScroll = GUILayout.BeginScrollView(targetScroll);
 
@@ -198,7 +199,7 @@ namespace AssetDependencyTool
             }
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.EndVertical();
-            SplitterGUILayout.EndVerticalSplit();
+            SplitterGUILayoutBridge.EndVerticalSplit();
 
             var ev = Event.current;
             if (ev.type == EventType.KeyDown)

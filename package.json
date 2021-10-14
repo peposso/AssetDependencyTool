@@ -1,8 +1,8 @@
 {
     "name": "peposso.assetdependencytool",
     "displayName": "Asset Dependency Tool",
-    "version": "0.9.0",
-    "unity": "2018.3",
+    "version": "0.9.1",
+    "unity": "2020.3",
     "description": "dependency/reference asset manager",
     "keywords": ["Reference", "Dependency"],
     "category": "Tools",

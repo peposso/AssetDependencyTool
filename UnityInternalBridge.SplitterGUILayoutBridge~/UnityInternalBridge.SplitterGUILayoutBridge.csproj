@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <RootNamespace>UnityInternalBridge</RootNamespace>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <_UnityVersion>2020.3.16f1</_UnityVersion>
+    <_UnityEditor>C:/Program Files/Unity/Hub/Editor/$(_UnityVersion)/Editor</_UnityEditor>
+    <_UnityEngine>$(_UnityEditor)/Data/Managed/UnityEngine</_UnityEngine>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="$(_UnityEngine)/UnityEngine.dll" />
+    <Reference Include="$(_UnityEngine)/UnityEngine.CoreModule.dll" />
+    <Reference Include="$(_UnityEngine)/UnityEngine.IMGUIModule.dll" />
+    <Reference Include="$(_UnityEngine)/UnityEditor.dll" />
+    <Reference Include="$(_UnityEngine)/UnityEditor.CoreModule.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="OpenSesame.Net.Compilers.Toolset" Version="3.11.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <!-- $ dotnet msbuild -target:EnableIgnoresAccessChecksForVscode -->
+  <Target Name="EnableIgnoresAccessChecksForVscode">
+    <Exec Command="dotnet tool install -g Csc-Manager" IgnoreExitCode="true" />
+    <Exec Command="csc-manager enable-vscode"/>
+  </Target>
+
+  <Target Name="_CopyForUnityPackage" AfterTargets="AfterBuild">
+    <Copy SourceFiles="$(OutputPath)$(AssemblyName).dll" DestinationFolder="../Editor/lib" SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>
